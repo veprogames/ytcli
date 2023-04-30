@@ -117,7 +117,7 @@ pub fn get_videos(html_body: String) -> Result<Vec<VideoData>, YoutubeError> {
 pub fn print_videos(videos: &Vec<VideoData>) -> String {
     let mut result = String::new();
     for (index, video) in videos.iter().enumerate() {
-        result += &format!("[{index}] {video}\n");
+        result = format!("[{index}] {video}") + &result;
     }
     result
 }
