@@ -52,6 +52,51 @@ impl CommandParser {
         let params = parts;
         Ok(CommandStructure { command, params })
     }
+
+    fn handle_query(&mut self, query: &str) -> CommandState {
+        let body = match youtube::get_document(query) {
+            Ok(body) => body,
+            Err(yt_err) => {
+                return CommandState::Error(yt_err.to_string());
+            }
+        };
+        match youtube::get_videos(body) {
+            Ok(videos) => {
+                let formatted = youtube::print_videos(&videos);
+                self.current_videos = videos;
+                return CommandState::Ok(format!("{}", formatted));
+            },
+            Err(yt_err) => CommandState::Error(yt_err.to_string())
+        }
+    }
+
+    fn handle_watch(&self, index_as_str: &str) -> CommandState{
+        let index = match index_as_str.parse::<usize>() {
+            Ok(num) => num,
+            Err(err) => {
+                return CommandState::Error(format!("Not a Number! ({})", err.to_string()));
+            }
+        };
+
+        match Command::new("mpv")
+            .arg(self.current_videos[index].get_url())
+            .spawn() {
+                Ok(mut child) => {
+                    if let Err(_) = child.wait() {
+                        return CommandState::Error("mpv wasn't running".to_string());
+                    }
+                    return CommandState::Ok(String::new());
+                },
+                Err(err) => CommandState::Error(format!("Cannot start mpv. Is it installed? {}", err.to_string())),
+            }
+    }
+
+    fn handle_help() -> CommandState {
+        CommandState::Ok("ytcli help:
+Query Videos: q(uery) [term]
+Watch Video: w(atch) [index]
+Exit: exit".to_string())
+    }
     
     pub fn handle_command(&mut self, cmd: &str) -> CommandState{
         let command: CommandStructure = match CommandParser::parse_command(cmd) {
@@ -64,45 +109,11 @@ impl CommandParser {
         match (command.command.as_str(), params.len()) {
             ("exit", 0) => CommandState::Exit,
             ("exit", _) => CommandState::Error("Usage: exit".to_string()),
-            ("q" | "query", 1) => {
-                let query = params[0].as_str();
-                let body = match youtube::get_document(query) {
-                    Ok(body) => body,
-                    Err(yt_err) => {
-                        return CommandState::Error(yt_err.to_string());
-                    }
-                };
-                match youtube::get_videos(body) {
-                    Ok(videos) => {
-                        let formatted = youtube::print_videos(&videos);
-                        self.current_videos = videos;
-                        return CommandState::Ok(format!("{}", formatted));
-                    },
-                    Err(yt_err) => CommandState::Error(yt_err.to_string())
-                }
-            },
+            ("q" | "query", 1) => self.handle_query(&params[0]),
             ("q" | "query", _) => CommandState::Error("Usage: q [term]".to_string()),
-            ("w" | "watch", 1) => {
-                let id = match params[0].parse::<usize>() {
-                    Ok(num) => num,
-                    Err(err) => {
-                        return CommandState::Error(format!("Not a Number! ({})", err.to_string()));
-                    }
-                };
-
-                match Command::new("mpv")
-                    .arg(self.current_videos[id].get_url())
-                    .spawn() {
-                        Ok(mut child) => {
-                            if let Err(_) = child.wait() {
-                                return CommandState::Error("mpv wasn't running".to_string());
-                            }
-                            return CommandState::Ok(String::new());
-                        },
-                        Err(err) => CommandState::Error(format!("Cannot start mpv. Is it installed? {}", err.to_string())),
-                    }
-            },
+            ("w" | "watch", 1) => self.handle_watch(&params[0]),
             ("w" | "watch", _) => CommandState::Error("Usage: watch [index]".to_string()),
+            ("h" | "help", _) => CommandParser::handle_help(),
             (unknown_command, _) => CommandState::Error(format!("Unknown Command: {unknown_command}")),
         }
     }
