@@ -1,10 +1,12 @@
 use std::io;
+use scraper::{Html, Selector};
 use ureq::Response;
 
 pub enum YoutubeError {
     RequestError(u16),
     TransportError,
     IOError(io::Error),
+    ParseError(String),
 }
 
 impl std::fmt::Display for YoutubeError{
@@ -14,6 +16,7 @@ impl std::fmt::Display for YoutubeError{
                 writeln!(f, "Request failed with code {}", code),
             YoutubeError::IOError(err) => writeln!(f, "I/O Error: {}", err.to_string()),
             YoutubeError::TransportError => writeln!(f, "Transport Error"),
+            YoutubeError::ParseError(reason) => writeln!(f, "Parse Error: {reason}"),
         }
     }
 }
@@ -50,4 +53,19 @@ pub fn get_document(query: &str) -> Result<String, YoutubeError> {
         Ok(string) => Ok(string),
         Err(err) => Err(YoutubeError::IOError(err)),
     }
+}
+
+pub fn get_videos(html_body: String) -> Result<Vec<String>, YoutubeError> {
+    let mut videos: Vec<String> = vec![];
+    let fragment = Html::parse_fragment(&html_body);
+    let selector = match Selector::parse("div.h-box > a:first-child") {
+        Ok(selector) => selector,
+        Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
+    };
+    for el in fragment.select(&selector) {
+        if let Some(link) = el.value().attr("href") {
+            videos.push(link.to_string());
+        }
+    }
+    Ok(videos)
 }

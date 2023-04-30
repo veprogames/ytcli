@@ -31,8 +31,14 @@ pub fn handle_command(cmd: &str) -> Result<CommandState, String>{
         ("exit", _) => Ok(CommandState::Error("Usage: exit".to_string())),
         ("q", 1) => {
             let query = params[0];
-            match youtube::get_document(query) {
-                Ok(body) => Ok(CommandState::Ok(body)),
+            let body = match youtube::get_document(query) {
+                Ok(body) => body,
+                Err(yt_err) => {
+                    return Ok(CommandState::Error(yt_err.to_string()));
+                }
+            };
+            match youtube::get_videos(body) {
+                Ok(videos) => Ok(CommandState::Ok(format!("{:?}", videos))),
                 Err(yt_err) => Ok(CommandState::Error(yt_err.to_string()))
             }
         },
