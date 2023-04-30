@@ -39,11 +39,10 @@ impl std::fmt::Display for VideoData {
     }
 }
 
-/// # Why Invidious?
-/// * Requests to individual instances -> bettwr privacy
-/// * Better Privacy through Invidious
+/// ## Why Invidious?
 /// * Easier to parse as Invidious is mostly independent of JS and
 /// is less cluttered
+/// * Better Privacy through Invidious
 const INSTANCE: &str = "https://yewtu.be";
 
 fn get_response(query: &str) -> Result<Response, ureq::Error> {
