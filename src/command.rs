@@ -8,9 +8,9 @@ pub enum CommandState {
     Exit,
 }
 
-struct CommandStructure<'a> {
-    command: &'a str,
-    params: VecDeque<&'a str>,
+struct CommandStructure {
+    command: String,
+    params: VecDeque<String>,
 }
 
 pub struct CommandParser {
@@ -22,8 +22,29 @@ impl CommandParser {
         CommandParser { current_videos: vec![] }
     }
 
+    fn get_command_parts(cmd: &str) -> VecDeque<String> {
+        let mut parts: VecDeque<String> = VecDeque::new();
+        let mut current_part = String::new();
+        let mut in_quotation = false;
+        for char in cmd.chars(){
+            match (char, in_quotation) {
+                ('"', _) => {
+                    in_quotation = !in_quotation;
+                },
+                (' ', false) => {
+                    parts.push_back(current_part.clone());
+                    current_part = String::new();
+                },
+                (_, _) => current_part += &char.to_string(),
+            }
+        }
+        // add to the Vec what's left in the String
+        parts.push_back(current_part.clone());
+        parts
+    }
+
     fn parse_command(cmd: &str) -> Result<CommandStructure, String> {
-        let mut parts: VecDeque<&str> = cmd.split(' ').collect();
+        let mut parts: VecDeque<String> = Self::get_command_parts(cmd);
         let command = match parts.pop_front() {
             Some(value) => value,
             None => { return Err("No Command given".to_string()); }
@@ -40,11 +61,11 @@ impl CommandParser {
             }
         };
         let params = command.params;
-        match (command.command, params.len()) {
+        match (command.command.as_str(), params.len()) {
             ("exit", 0) => CommandState::Exit,
             ("exit", _) => CommandState::Error("Usage: exit".to_string()),
             ("q" | "query", 1) => {
-                let query = params[0];
+                let query = params[0].as_str();
                 let body = match youtube::get_document(query) {
                     Ok(body) => body,
                     Err(yt_err) => {
