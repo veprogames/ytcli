@@ -17,14 +17,9 @@ fn main() -> Result<(), String> {
             return Err(err.to_string());
         }
         match parser.handle_command(input.trim_end()) {
-            Ok(state) => {
-                match state {
-                    command::CommandState::Ok(out) => println!("{out}"),
-                    command::CommandState::Exit => { return Ok(()) },
-                    command::CommandState::Error(reason) => println!("{reason}"),
-                }
-            },
-            Err(err) => println!("Error: {err}"),
+            command::CommandState::Ok(out) => println!("{out}"),
+            command::CommandState::Exit => { return Ok(()) },
+            command::CommandState::Error(reason) => println!("{reason}"),
         }
     }
 }

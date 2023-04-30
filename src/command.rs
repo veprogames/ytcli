@@ -32,35 +32,40 @@ impl CommandParser {
         Ok(CommandStructure { command, params })
     }
     
-    pub fn handle_command(&mut self, cmd: &str) -> Result<CommandState, String>{
-        let command: CommandStructure = CommandParser::parse_command(cmd)?;
+    pub fn handle_command(&mut self, cmd: &str) -> CommandState{
+        let command: CommandStructure = match CommandParser::parse_command(cmd) {
+            Ok(structure) => structure,
+            Err(_) => {
+                return CommandState::Error("Invalid Syntax".to_string());
+            }
+        };
         let params = command.params;
         match (command.command, params.len()) {
-            ("exit", 0) => Ok(CommandState::Exit),
-            ("exit", _) => Ok(CommandState::Error("Usage: exit".to_string())),
+            ("exit", 0) => CommandState::Exit,
+            ("exit", _) => CommandState::Error("Usage: exit".to_string()),
             ("q" | "query", 1) => {
                 let query = params[0];
                 let body = match youtube::get_document(query) {
                     Ok(body) => body,
                     Err(yt_err) => {
-                        return Ok(CommandState::Error(yt_err.to_string()));
+                        return CommandState::Error(yt_err.to_string());
                     }
                 };
                 match youtube::get_videos(body) {
                     Ok(videos) => {
                         let formatted = youtube::print_videos(&videos);
                         self.current_videos = videos;
-                        return Ok(CommandState::Ok(format!("{}", formatted)));
+                        return CommandState::Ok(format!("{}", formatted));
                     },
-                    Err(yt_err) => Ok(CommandState::Error(yt_err.to_string()))
+                    Err(yt_err) => CommandState::Error(yt_err.to_string())
                 }
             },
-            ("q" | "query", _) => Ok(CommandState::Error("Usage: q [term]".to_string())),
+            ("q" | "query", _) => CommandState::Error("Usage: q [term]".to_string()),
             ("w" | "watch", 1) => {
                 let id = match params[0].parse::<usize>() {
                     Ok(num) => num,
                     Err(err) => {
-                        return Ok(CommandState::Error(format!("Not a Number! ({})", err.to_string())));
+                        return CommandState::Error(format!("Not a Number! ({})", err.to_string()));
                     }
                 };
 
@@ -69,15 +74,15 @@ impl CommandParser {
                     .spawn() {
                         Ok(mut child) => {
                             if let Err(_) = child.wait() {
-                                return Ok(CommandState::Error("mpv wasn't running".to_string()));
+                                return CommandState::Error("mpv wasn't running".to_string());
                             }
-                            return Ok(CommandState::Ok(String::new()));
+                            return CommandState::Ok(String::new());
                         },
-                        Err(err) => Ok(CommandState::Error(format!("Cannot start mpv. Is it installed? {}", err.to_string()))),
+                        Err(err) => CommandState::Error(format!("Cannot start mpv. Is it installed? {}", err.to_string())),
                     }
             },
-            ("w" | "watch", _) => Ok(CommandState::Error("Usage: watch [index]".to_string())),
-            (unknown_command, _) => Ok(CommandState::Error(format!("Unknown Command: {unknown_command}"))),
+            ("w" | "watch", _) => CommandState::Error("Usage: watch [index]".to_string()),
+            (unknown_command, _) => CommandState::Error(format!("Unknown Command: {unknown_command}")),
         }
     }
 }
