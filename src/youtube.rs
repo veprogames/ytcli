@@ -27,6 +27,12 @@ pub struct VideoData {
     author: String,
 }
 
+impl VideoData {
+    pub fn get_url(&self) -> String {
+        format!("{INSTANCE}{}", self.link)
+    }
+}
+
 impl std::fmt::Display for VideoData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{} by {} [{}]", self.title, self.author, self.link)
