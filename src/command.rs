@@ -38,7 +38,7 @@ pub fn handle_command(cmd: &str) -> Result<CommandState, String>{
                 }
             };
             match youtube::get_videos(body) {
-                Ok(videos) => Ok(CommandState::Ok(format!("{:?}", videos))),
+                Ok(videos) => Ok(CommandState::Ok(format!("{}", youtube::print_videos(&videos)))),
                 Err(yt_err) => Ok(CommandState::Error(yt_err.to_string()))
             }
         },

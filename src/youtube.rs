@@ -21,6 +21,18 @@ impl std::fmt::Display for YoutubeError{
     }
 }
 
+pub struct VideoData {
+    link: String,
+    title: String,
+    author: String,
+}
+
+impl std::fmt::Display for VideoData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{} by {} [{}]", self.title, self.author, self.link)
+    }
+}
+
 /// # Why Invidious?
 /// * Requests to individual instances -> bettwr privacy
 /// * Better Privacy through Invidious
@@ -55,17 +67,52 @@ pub fn get_document(query: &str) -> Result<String, YoutubeError> {
     }
 }
 
-pub fn get_videos(html_body: String) -> Result<Vec<String>, YoutubeError> {
-    let mut videos: Vec<String> = vec![];
+pub fn get_videos(html_body: String) -> Result<Vec<VideoData>, YoutubeError> {
+    let mut videos: Vec<VideoData> = vec![];
     let fragment = Html::parse_fragment(&html_body);
-    let selector = match Selector::parse("div.h-box > a:first-child") {
+    
+    let selector_box = match Selector::parse("div.h-box") {
         Ok(selector) => selector,
         Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
     };
-    for el in fragment.select(&selector) {
-        if let Some(link) = el.value().attr("href") {
-            videos.push(link.to_string());
-        }
+    let selector_link = match Selector::parse("a:first-child") {
+        Ok(selector) => selector,
+        Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
+    };
+    let selector_title = match Selector::parse(r#"a:first-child > p[dir="auto"]"#) {
+        Ok(selector) => selector,
+        Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
+    };
+    let selector_author = match Selector::parse("p.channel-name") {
+        Ok(selector) => selector,
+        Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
+    };
+
+    for el in fragment.select(&selector_box) {
+        let title = match el.select(&selector_title).next(){
+            Some(element) => element.inner_html(),
+            None => { continue; }
+        };
+        let author = match el.select(&selector_author).next(){
+            Some(element) => element.inner_html(),
+            None => "Unknown Author".to_string()
+        };
+        let link = match el.select(&selector_link).next(){
+            Some(element) => match element.value().attr("href") {
+                Some(href) => href.to_string(),
+                None => "/".to_string()
+            },
+            None => "/".to_string()
+        };
+        videos.push(VideoData { link, title, author });
     }
     Ok(videos)
+}
+
+pub fn print_videos(videos: &Vec<VideoData>) -> String {
+    let mut result = String::new();
+    for (index, video) in videos.iter().enumerate() {
+        result += &format!("[{index}] {video}\n");
+    }
+    result
 }
