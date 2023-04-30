@@ -1,7 +1,9 @@
 use std::collections::VecDeque;
 
+use crate::youtube;
+
 pub enum CommandState {
-    Success,
+    Ok(String),
     Error(String),
     Exit,
 }
@@ -23,9 +25,17 @@ fn parse_command(cmd: &str) -> Result<CommandStructure, String> {
 
 pub fn handle_command(cmd: &str) -> Result<CommandState, String>{
     let command: CommandStructure = parse_command(cmd)?;
-    match (command.command, command.params.len()) {
+    let params = command.params;
+    match (command.command, params.len()) {
         ("exit", 0) => Ok(CommandState::Exit),
         ("exit", _) => Ok(CommandState::Error("Usage: exit".to_string())),
+        ("q", 1) => {
+            let query = params[0];
+            match youtube::get_document(query) {
+                Ok(body) => Ok(CommandState::Ok(body)),
+                Err(yt_err) => Ok(CommandState::Error(yt_err.to_string()))
+            }
+        },
         (unknown_command, _) => Ok(CommandState::Error(format!("Unknown Command: {unknown_command}"))),
     }
 }

@@ -1,4 +1,5 @@
 mod command;
+mod youtube;
 use std::io;
 
 use crate::command::handle_command;
@@ -16,7 +17,7 @@ fn main() -> Result<(), String> {
         match handle_command(input.trim_end()) {
             Ok(state) => {
                 match state {
-                    command::CommandState::Success => {},
+                    command::CommandState::Ok(out) => println!("{out}"),
                     command::CommandState::Exit => { return Ok(()) },
                     command::CommandState::Error(reason) => println!("{reason}"),
                 }
