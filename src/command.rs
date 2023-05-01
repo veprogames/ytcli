@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, process::Command};
 
-use crate::youtube::{self, VideoData};
+use crate::youtube;
 
 pub enum CommandState {
     Ok(String),
@@ -14,7 +14,7 @@ struct CommandStructure {
 }
 
 pub struct CommandParser {
-    current_videos: Vec<VideoData>
+    current_videos: Vec<youtube::Content>
 }
 
 impl CommandParser {
@@ -54,14 +54,10 @@ impl CommandParser {
     }
 
     fn handle_query(&mut self, query: &str) -> CommandState {
-        let body = match youtube::get_document(query) {
-            Ok(body) => body,
-            Err(yt_err) => return CommandState::Error(yt_err.to_string())
-        };
-        match youtube::get_videos(body) {
-            Ok(videos) => {
-                let formatted = youtube::print_videos(&videos);
-                self.current_videos = videos;
+        match youtube::get_content(query) {
+            Ok(content) => {
+                let formatted = youtube::print_content(&content);
+                self.current_videos = content;
                 return CommandState::Ok(format!("{}", formatted));
             },
             Err(yt_err) => CommandState::Error(yt_err.to_string())
@@ -74,8 +70,18 @@ impl CommandParser {
             Err(err) => return CommandState::Error(format!("Not a Number! ({})", err.to_string()))
         };
 
+        let content = match self.current_videos.get(index) {
+            Some(content) => content,
+            None => return CommandState::Error("Index out of bounds!".to_string())
+        };
+
+        let url = match content {
+            youtube::Content::Video(video) => video.get_url(),
+            youtube::Content::Unknown => return CommandState::Error("Cannot watch unknown Content".to_string())
+        };
+
         match Command::new("mpv")
-            .arg(self.current_videos[index].get_url())
+            .arg(url)
             .spawn() {
                 Ok(mut child) => {
                     if let Err(_) = child.wait() {

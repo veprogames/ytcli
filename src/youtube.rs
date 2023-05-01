@@ -1,5 +1,5 @@
 use std::io;
-use scraper::{Html, Selector};
+use scraper::{Html, Selector, ElementRef};
 use ureq::Response;
 
 pub enum YoutubeError {
@@ -35,8 +35,13 @@ impl VideoData {
 
 impl std::fmt::Display for VideoData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{} by {} [{}]", self.title, self.author, self.link)
+        write!(f, "{} by {} [{}]", self.title, self.author, self.link)
     }
+}
+
+pub enum Content {
+    Video(VideoData),
+    Unknown
 }
 
 /// ## Why Invidious?
@@ -52,7 +57,7 @@ fn get_response(query: &str) -> Result<Response, ureq::Error> {
     request.call()
 }
 
-pub fn get_document(query: &str) -> Result<String, YoutubeError> {
+fn get_document(query: &str) -> Result<String, YoutubeError> {
     let response = match get_response(query) {
         Err(req_error) => {
             match req_error {
@@ -68,53 +73,69 @@ pub fn get_document(query: &str) -> Result<String, YoutubeError> {
     }
 }
 
-pub fn get_videos(html_body: String) -> Result<Vec<VideoData>, YoutubeError> {
-    let mut videos: Vec<VideoData> = vec![];
-    let fragment = Html::parse_fragment(&html_body);
-    
-    let selector_box = match Selector::parse("div.h-box") {
-        Ok(selector) => selector,
+fn selector(selector: &str) -> Result<Selector, YoutubeError> {
+    match Selector::parse(selector) {
+        Ok(selector) => Ok(selector),
         Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
-    };
-    let selector_link = match Selector::parse("a:first-child") {
-        Ok(selector) => selector,
-        Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
-    };
-    let selector_title = match Selector::parse(r#"a:first-child > p[dir="auto"]"#) {
-        Ok(selector) => selector,
-        Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
-    };
-    let selector_author = match Selector::parse("p.channel-name") {
-        Ok(selector) => selector,
-        Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
-    };
-
-    for el in fragment.select(&selector_box) {
-        let title = match el.select(&selector_title).next(){
-            Some(element) => element.inner_html(),
-            None => continue
-        };
-        let author = match el.select(&selector_author).next(){
-            Some(element) => element.text()
-                .next().unwrap_or("Unknown Author").to_string(),
-            None => "Unknown Author".to_string()
-        };
-        let link = match el.select(&selector_link).next(){
-            Some(element) => match element.value().attr("href") {
-                Some(href) => href.to_string(),
-                None => "/".to_string()
-            },
-            None => "/".to_string()
-        };
-        videos.push(VideoData { link, title, author });
     }
-    Ok(videos)
 }
 
-pub fn print_videos(videos: &Vec<VideoData>) -> String {
+fn get_content_video(html_element: ElementRef, link: &str) -> Result<Content, YoutubeError>{
+    let title = match html_element.select(
+        &selector(r#"a:first-child > p[dir="auto"]"#)?
+    ).next() {
+        Some(element) => element.text().next().unwrap_or("Unknown Title"),
+        None => "Unknown Title"
+    };
+    
+    let author = match html_element.select(
+        &selector("p.channel-name")?
+    ).next() {
+        Some(element) => element.text().next().unwrap_or("Unknown Author"),
+        None => "Unknown Author"
+    };
+
+    Ok(Content::Video(VideoData { link: link.to_string(), title: title.to_string(), author: author.to_string() }))
+}
+
+pub fn get_content(query: &str) -> Result<Vec<Content>, YoutubeError> {
+    let body = get_document(query)?;
+    let fragment = Html::parse_fragment(&body);
+    let mut content: Vec<Content> = vec![];
+
+    let selector_content = selector("div.h-box")?;
+    let selector_link = selector("a:first-child")?;
+
+    for element in fragment.select(&selector_content) {
+        let link = match element.select(&selector_link).next() {
+            Some(a) => match a.value().attr("href") {
+                Some(href) => href,
+                None => continue,
+            },
+            None => continue,
+        };
+
+        let next_content = if link.starts_with("/watch") {
+            get_content_video(element, link)?
+        }
+        else {
+            Content::Unknown
+        };
+
+        content.push(next_content);
+    }
+
+    Ok(content)
+}
+
+pub fn print_content(videos: &Vec<Content>) -> String {
     let mut result = String::new();
-    for (index, video) in videos.iter().enumerate() {
-        result = format!("[{index}] {video}") + &result;
+    for (index, content) in videos.iter().enumerate() {
+        let content_string = match content {
+            Content::Video(video) => video.to_string(),
+            Content::Unknown => "Unknown Content".to_string()
+        };
+        result = format!("[{index}] {content_string}\n") + &result;
     }
     result
 }
