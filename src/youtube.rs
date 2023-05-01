@@ -142,7 +142,9 @@ pub fn print_content(videos: &Vec<Content>) -> String {
             Content::Playlist => String::from("Playlist"),
             Content::Unknown => String::from("Unknown Content")
         };
-        result = format!("[{index}] {content_string}\n") + &result;
+        // do not display a line break at the end, which was produced by the first element
+        let line_break = if index == 0 { "" } else { "\n" };
+        result = format!("[{index}] {content_string}{line_break}") + &result;
     }
     result
 }
