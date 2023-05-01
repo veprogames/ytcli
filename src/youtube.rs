@@ -82,22 +82,19 @@ fn selector(selector: &str) -> Result<Selector, YoutubeError> {
     }
 }
 
-fn get_content_video(html_element: ElementRef, link: &str) -> Result<Content, YoutubeError>{
-    let title = match html_element.select(
-        &selector(r#"a:first-child > p[dir="auto"]"#)?
+fn get_inner_text(html_element: ElementRef, sel: &str, fallback: &str) -> Result<String, YoutubeError> {
+    match html_element.select(
+        &selector(sel)?
     ).next() {
-        Some(element) => element.text().next().unwrap_or("Unknown Title"),
-        None => "Unknown Title"
-    };
-    
-    let author = match html_element.select(
-        &selector("p.channel-name")?
-    ).next() {
-        Some(element) => element.text().next().unwrap_or("Unknown Author"),
-        None => "Unknown Author"
-    };
+        Some(element) => Ok(element.text().next().unwrap_or(fallback).to_string()),
+        None => Ok(fallback.to_string()),
+    }
+}
 
-    Ok(Content::Video(VideoData { link: link.to_string(), title: title.to_string(), author: author.to_string() }))
+fn get_content_video(html_element: ElementRef, link: &str) -> Result<Content, YoutubeError>{
+    let title = get_inner_text(html_element, r#"a:first-child > p[dir="auto"]"#, "Unknown Title")?;
+    let author = get_inner_text(html_element, "p.channel-name", "Unknown Author")?;
+    Ok(Content::Video(VideoData { link: link.to_string(), title, author }))
 }
 
 pub fn get_content(query: &str) -> Result<Vec<Content>, YoutubeError> {
