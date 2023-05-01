@@ -41,7 +41,9 @@ impl std::fmt::Display for VideoData {
 
 pub enum Content {
     Video(VideoData),
-    Unknown
+    Channel,
+    Playlist,
+    Unknown,
 }
 
 /// ## Why Invidious?
@@ -118,6 +120,12 @@ pub fn get_content(query: &str) -> Result<Vec<Content>, YoutubeError> {
         let next_content = if link.starts_with("/watch") {
             get_content_video(element, link)?
         }
+        else if link.starts_with("/playlist") {
+            Content::Playlist
+        }
+        else if link.starts_with("/channel") {
+            Content::Channel
+        }
         else {
             Content::Unknown
         };
@@ -133,7 +141,9 @@ pub fn print_content(videos: &Vec<Content>) -> String {
     for (index, content) in videos.iter().enumerate() {
         let content_string = match content {
             Content::Video(video) => video.to_string(),
-            Content::Unknown => "Unknown Content".to_string()
+            Content::Channel => String::from("Channel"),
+            Content::Playlist => String::from("Playlist"),
+            Content::Unknown => String::from("Unknown Content")
         };
         result = format!("[{index}] {content_string}\n") + &result;
     }
