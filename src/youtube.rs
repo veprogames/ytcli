@@ -99,7 +99,8 @@ pub fn get_videos(html_body: String) -> Result<Vec<VideoData>, YoutubeError> {
             None => { continue; }
         };
         let author = match el.select(&selector_author).next(){
-            Some(element) => element.inner_html(),
+            Some(element) => element.text()
+                .next().unwrap_or("Unknown Author").to_string(),
             None => "Unknown Author".to_string()
         };
         let link = match el.select(&selector_link).next(){
