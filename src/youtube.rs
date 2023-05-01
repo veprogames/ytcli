@@ -56,12 +56,8 @@ pub fn get_document(query: &str) -> Result<String, YoutubeError> {
     let response = match get_response(query) {
         Err(req_error) => {
             match req_error {
-                ureq::Error::Status(code, _) => {
-                    return Err(YoutubeError::RequestError(code));
-                },
-                ureq::Error::Transport(_) => {
-                    return Err(YoutubeError::TransportError);
-                }
+                ureq::Error::Status(code, _) => return Err(YoutubeError::RequestError(code)),
+                ureq::Error::Transport(_) => return Err(YoutubeError::TransportError)
             }
         },
         Ok(response) => response
@@ -78,25 +74,25 @@ pub fn get_videos(html_body: String) -> Result<Vec<VideoData>, YoutubeError> {
     
     let selector_box = match Selector::parse("div.h-box") {
         Ok(selector) => selector,
-        Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
+        Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
     };
     let selector_link = match Selector::parse("a:first-child") {
         Ok(selector) => selector,
-        Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
+        Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
     };
     let selector_title = match Selector::parse(r#"a:first-child > p[dir="auto"]"#) {
         Ok(selector) => selector,
-        Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
+        Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
     };
     let selector_author = match Selector::parse("p.channel-name") {
         Ok(selector) => selector,
-        Err(err) => { return Err(YoutubeError::ParseError(err.to_string())); }
+        Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
     };
 
     for el in fragment.select(&selector_box) {
         let title = match el.select(&selector_title).next(){
             Some(element) => element.inner_html(),
-            None => { continue; }
+            None => continue
         };
         let author = match el.select(&selector_author).next(){
             Some(element) => element.text()
