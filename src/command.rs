@@ -94,11 +94,11 @@ impl CommandParser {
             }
     }
 
-    fn handle_help() -> CommandState {
-        CommandState::Ok("ytcli help:
+    fn get_help() -> String {
+        "ytcli help:
 Query Videos: q(uery) [term]
 Watch Video: w(atch) [index]
-Exit: exit".to_string())
+Exit: exit".to_string()
     }
     
     pub fn handle_command(&mut self, cmd: &str) -> CommandState{
@@ -114,8 +114,8 @@ Exit: exit".to_string())
             ("q" | "query", _) => CommandState::Error("Usage: q [term]".to_string()),
             ("w" | "watch", 1) => self.handle_watch(&params[0]),
             ("w" | "watch", _) => CommandState::Error("Usage: watch [index]".to_string()),
-            ("h" | "help", _) => CommandParser::handle_help(),
-            (unknown_command, _) => CommandState::Error(format!("Unknown Command: {unknown_command}")),
+            ("h" | "help", _) => CommandState::Ok(CommandParser::get_help()),
+            (unknown_command, _) => CommandState::Error(format!("Unknown Command: {unknown_command}\n{}", CommandParser::get_help())),
         }
     }
 }
