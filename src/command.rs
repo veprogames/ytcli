@@ -77,7 +77,8 @@ impl CommandParser {
 
         let url = match content {
             youtube::Content::Video(video) => video.get_url(),
-            youtube::Content::Playlist | youtube::Content::Channel => return CommandState::Error("Cannot watch Channel or Playlist directly".to_string()),
+            youtube::Content::Playlist(..) | youtube::Content::Channel(..) => return CommandState::Error("Cannot watch Channel or Playlist directly".to_string()),
+            youtube::Content::Navigation(..) => return CommandState::Error("Cannot watch navigational Content".to_string()),
             youtube::Content::Unknown => return CommandState::Error("Cannot watch unknown Content".to_string())
         };
 

@@ -39,10 +39,45 @@ impl std::fmt::Display for VideoData {
     }
 }
 
+pub struct ChannelData {
+    link: String,
+    name: String,
+    subscribers: usize,
+}
+
+impl std::fmt::Display for ChannelData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Channel: {} [{} Subscribers] [{}]", self.name, self.subscribers, self.link)
+    }
+}
+
+pub struct PlaylistData {
+    link: String,
+    name: String,
+    length: u16,
+}
+
+impl std::fmt::Display for PlaylistData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Playlist: {} [{} Videos] [{}]", self.name, self.length, self.link)
+    }
+}
+
+pub struct NavigationData {
+    link: String,
+}
+
+impl std::fmt::Display for NavigationData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Navigation: {}", self.link)
+    }
+}
+
 pub enum Content {
     Video(VideoData),
-    Channel,
-    Playlist,
+    Channel(ChannelData),
+    Playlist(PlaylistData),
+    Navigation(NavigationData),
     Unknown,
 }
 
@@ -97,6 +132,30 @@ fn get_content_video(html_element: ElementRef, link: &str) -> Result<Content, Yo
     Ok(Content::Video(VideoData { link: link.to_string(), title, author }))
 }
 
+fn get_content_channel(html_element: ElementRef, link: &str) -> Result<Content, YoutubeError> {
+    let channel_name = get_inner_text(html_element, "a:first-child > p", "Unknown Channel")?;
+    let subscribers = get_inner_text(html_element, "a~p", "0 subscribers")?;
+    let subscribers = match subscribers.split(' ').next().unwrap_or("0 subscribers")
+        .replace(",", "")
+        .parse::<usize>() {
+            Ok(subs) => subs,
+            Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
+        };
+    Ok(Content::Channel(ChannelData { link: link.to_string(), name: channel_name, subscribers }))
+}
+
+fn get_content_playlist(html_element: ElementRef, link: &str) -> Result<Content, YoutubeError> {
+    let playlist_name = get_inner_text(html_element, "a:first-child > p", "Unknown Playlist")?;
+    let playlist_length = get_inner_text(html_element, "p.length", "0 videos")?;
+    let length = match playlist_length.split(' ').next().unwrap_or("0")
+        .parse::<u16>() {
+            Ok(count) => count,
+            Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
+    };
+
+    Ok(Content::Playlist(PlaylistData { link: link.to_string(), name: playlist_name, length }))
+}
+
 pub fn get_content(query: &str) -> Result<Vec<Content>, YoutubeError> {
     let body = get_document(query)?;
     let fragment = Html::parse_fragment(&body);
@@ -118,10 +177,13 @@ pub fn get_content(query: &str) -> Result<Vec<Content>, YoutubeError> {
             get_content_video(element, link)?
         }
         else if link.starts_with("/playlist") {
-            Content::Playlist
+            get_content_playlist(element, link)?
         }
         else if link.starts_with("/channel") {
-            Content::Channel
+            get_content_channel(element, link)?
+        }
+        else if link.starts_with("/") {
+            Content::Navigation(NavigationData { link: link.to_string() })
         }
         else {
             Content::Unknown
@@ -138,9 +200,10 @@ pub fn print_content(videos: &Vec<Content>) -> String {
     for (index, content) in videos.iter().enumerate() {
         let content_string = match content {
             Content::Video(video) => video.to_string(),
-            Content::Channel => String::from("Channel"),
-            Content::Playlist => String::from("Playlist"),
-            Content::Unknown => String::from("Unknown Content")
+            Content::Channel(channel) => channel.to_string(),
+            Content::Playlist(playlist) => playlist.to_string(),
+            Content::Navigation(navigation) => navigation.to_string(),
+            Content::Unknown => String::from("Unknown Content"),
         };
         // do not display a line break at the end, which was produced by the first element
         let line_break = if index == 0 { "" } else { "\n" };
