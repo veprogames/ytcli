@@ -1,6 +1,7 @@
 use std::io;
 use scraper::{Html, Selector, ElementRef};
 use ureq::Response;
+use colored::{Colorize, ColoredString};
 
 use crate::format;
 
@@ -52,7 +53,7 @@ pub struct ChannelData {
 
 impl std::fmt::Display for ChannelData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Channel: {} [{} Subscribers] [{}]", self.name, format::format(self.subscribers), self.link)
+        write!(f, "{} [{} Subscribers] [{}]", self.name, format::format(self.subscribers), self.link)
     }
 }
 
@@ -64,7 +65,7 @@ pub struct PlaylistData {
 
 impl std::fmt::Display for PlaylistData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Playlist: {} [{} Videos] [{}]", self.name, self.length, self.link)
+        write!(f, "{} [{} Videos] [{}]", self.name, self.length, self.link)
     }
 }
 
@@ -74,7 +75,7 @@ pub struct NavigationData {
 
 impl std::fmt::Display for NavigationData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Navigation: {}", self.link)
+        write!(f, "{}", self.link)
     }
 }
 
@@ -200,6 +201,15 @@ pub fn get_content(query: &str) -> Result<Vec<Content>, YoutubeError> {
     Ok(content)
 }
 
+fn get_line_styled(line: String, content: &Content) -> ColoredString {
+    match content {
+        Content::Channel(..) => line.green(),
+        Content::Playlist(..) => line.yellow(),
+        Content::Navigation(..) => line.underline(),
+        _ => line.normal()
+    }
+}
+
 pub fn print_content(videos: &Vec<Content>) -> String {
     let mut result = String::new();
     for (index, content) in videos.iter().enumerate() {
@@ -212,7 +222,9 @@ pub fn print_content(videos: &Vec<Content>) -> String {
         };
         // do not display a line break at the end, which was produced by the first element
         let line_break = if index == 0 { "" } else { "\n" };
-        result = format!("[{index}] {content_string}{line_break}") + &result;
+        let line = format!("[{index}] {content_string}{line_break}");
+        let line = get_line_styled(line, &content).to_string();
+        result = line + &result;
     }
     result
 }
