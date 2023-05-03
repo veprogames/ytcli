@@ -4,6 +4,7 @@ mod format;
 use std::io;
 
 use crate::command::CommandParser;
+use colored::Colorize;
 
 fn main() -> Result<(), String> {
     let mut parser = CommandParser::new();
@@ -20,7 +21,7 @@ fn main() -> Result<(), String> {
         match parser.handle_command(input.trim_end()) {
             command::CommandState::Ok(out) => println!("{out}"),
             command::CommandState::Exit => { return Ok(()) },
-            command::CommandState::Error(reason) => println!("{reason}"),
+            command::CommandState::Error(reason) => println!("{}", reason.red()),
         }
     }
 }
