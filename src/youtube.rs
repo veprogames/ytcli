@@ -95,7 +95,7 @@ const INSTANCE: &str = "https://yewtu.be";
 
 fn get_response(query: &str) -> Result<Response, ureq::Error> {
     let request = ureq::get(
-        format!("{INSTANCE}/search?q={query}").as_str()
+        format!("{INSTANCE}{query}").as_str()
     );
     request.call()
 }
@@ -227,4 +227,14 @@ pub fn print_content(videos: &Vec<Content>) -> String {
         result = line + &result;
     }
     result
+}
+
+pub fn get_content_link(content: &Content) -> &str{
+    match content {
+        Content::Video(video) => &video.link,
+        Content::Channel(channel) => &channel.link,
+        Content::Playlist(playlist) => &playlist.link,
+        Content::Navigation(nav) => &nav.link,
+        Content::Unknown => "/"
+    }
 }

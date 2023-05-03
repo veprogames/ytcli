@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, process::Command};
 
-use crate::youtube;
+use crate::youtube::{self, get_content_link};
 
 pub enum CommandState {
     Ok(String),
@@ -14,12 +14,12 @@ struct CommandStructure {
 }
 
 pub struct CommandParser {
-    current_videos: Vec<youtube::Content>
+    current_content: Vec<youtube::Content>
 }
 
 impl CommandParser {
     pub fn new() -> CommandParser {
-        CommandParser { current_videos: vec![] }
+        CommandParser { current_content: vec![] }
     }
 
     fn get_command_parts(cmd: &str) -> VecDeque<String> {
@@ -57,10 +57,27 @@ impl CommandParser {
         match youtube::get_content(query) {
             Ok(content) => {
                 let formatted = youtube::print_content(&content);
-                self.current_videos = content;
+                self.current_content = content;
                 return CommandState::Ok(format!("{}", formatted));
             },
             Err(yt_err) => CommandState::Error(yt_err.to_string())
+        }
+    }
+
+    fn get_query_url(&self, param: &str) -> Result<String, CommandState> {
+        match param.trim().parse::<usize>() {
+            Ok(index) => {
+                match self.current_content.get(index) {
+                    Some(content) => match content {
+                        youtube::Content::Video(..) => Err(
+                            CommandState::Error(String::from("Cannot query a video directly. Use w(atch) instead"))
+                        ),
+                        _ => Ok(get_content_link(content).to_string())
+                    },
+                    None => Err(CommandState::Error(String::from("Index out of bounds!")))
+                }
+            },
+            Err(..) => Ok(format!("/search?q={}", param))
         }
     }
 
@@ -70,7 +87,7 @@ impl CommandParser {
             Err(err) => return CommandState::Error(format!("Not a Number! ({})", err.to_string()))
         };
 
-        let content = match self.current_videos.get(index) {
+        let content = match self.current_content.get(index) {
             Some(content) => content,
             None => return CommandState::Error("Index out of bounds!".to_string())
         };
@@ -111,7 +128,13 @@ Exit: exit".to_string()
         match (command.command.as_str(), params.len()) {
             ("exit", 0) => CommandState::Exit,
             ("exit", _) => CommandState::Error("Usage: exit".to_string()),
-            ("q" | "query", 1) => self.handle_query(&params[0]),
+            ("q" | "query", 1) => {
+                let url = match self.get_query_url(&params[0]) {
+                    Ok(url) => url,
+                    Err(state) => return state
+                };
+                self.handle_query(&url)
+            },
             ("q" | "query", _) => CommandState::Error("Usage: q [term]".to_string()),
             ("w" | "watch", 1) => self.handle_watch(&params[0]),
             ("w" | "watch", _) => CommandState::Error("Usage: watch [index]".to_string()),
