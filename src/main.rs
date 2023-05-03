@@ -1,5 +1,6 @@
 mod command;
 mod youtube;
+mod format;
 use std::io;
 
 use crate::command::CommandParser;

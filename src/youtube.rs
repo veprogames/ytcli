@@ -2,6 +2,8 @@ use std::io;
 use scraper::{Html, Selector, ElementRef};
 use ureq::Response;
 
+use crate::format;
+
 pub enum YoutubeError {
     RequestError(u16),
     TransportError,
@@ -25,6 +27,8 @@ pub struct VideoData {
     link: String,
     title: String,
     author: String,
+    views: u64,
+    length: String,
 }
 
 impl VideoData {
@@ -35,19 +39,20 @@ impl VideoData {
 
 impl std::fmt::Display for VideoData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} by {} [{}]", self.title, self.author, self.link)
+        write!(f, "{} by {} | {} Views [{}] [{}]", self.title, self.author, 
+            format::format(self.views), self.length, self.link)
     }
 }
 
 pub struct ChannelData {
     link: String,
     name: String,
-    subscribers: usize,
+    subscribers: u64,
 }
 
 impl std::fmt::Display for ChannelData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Channel: {} [{} Subscribers] [{}]", self.name, self.subscribers, self.link)
+        write!(f, "Channel: {} [{} Subscribers] [{}]", self.name, format::format(self.subscribers), self.link)
     }
 }
 
@@ -129,18 +134,18 @@ fn get_inner_text(html_element: ElementRef, sel: &str, fallback: &str) -> Result
 fn get_content_video(html_element: ElementRef, link: &str) -> Result<Content, YoutubeError>{
     let title = get_inner_text(html_element, r#"a:first-child > p[dir="auto"]"#, "Unknown Title")?;
     let author = get_inner_text(html_element, "p.channel-name", "Unknown Author")?;
-    Ok(Content::Video(VideoData { link: link.to_string(), title, author }))
+    let length = get_inner_text(html_element, "p.length", "0:00")?;
+    let views = get_inner_text(html_element, "div.flex-right > p.video-data", "0 views")?;
+    let views = views.split(' ').next().unwrap_or("0");
+    let views = format::parse(views)?;
+    Ok(Content::Video(VideoData { link: link.to_string(), title, author, length, views }))
 }
 
 fn get_content_channel(html_element: ElementRef, link: &str) -> Result<Content, YoutubeError> {
     let channel_name = get_inner_text(html_element, "a:first-child > p", "Unknown Channel")?;
     let subscribers = get_inner_text(html_element, "a~p", "0 subscribers")?;
-    let subscribers = match subscribers.split(' ').next().unwrap_or("0 subscribers")
-        .replace(",", "")
-        .parse::<usize>() {
-            Ok(subs) => subs,
-            Err(err) => return Err(YoutubeError::ParseError(err.to_string()))
-        };
+    let subscribers = subscribers.split(' ').next().unwrap_or("0");
+    let subscribers = format::parse(subscribers)?;
     Ok(Content::Channel(ChannelData { link: link.to_string(), name: channel_name, subscribers }))
 }
 
