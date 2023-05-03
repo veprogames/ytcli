@@ -162,6 +162,24 @@ fn get_content_playlist(html_element: ElementRef, link: &str) -> Result<Content,
     Ok(Content::Playlist(PlaylistData { link: link.to_string(), name: playlist_name, length }))
 }
 
+fn get_next_content(element: ElementRef, link: &str) -> Result<Content, YoutubeError> {
+    if link.starts_with("/watch") {
+        get_content_video(element, link)
+    }
+    else if link.starts_with("/playlist") {
+        get_content_playlist(element, link)
+    }
+    else if link.starts_with("/channel") {
+        get_content_channel(element, link)
+    }
+    else if link.starts_with("/") {
+        Ok(Content::Navigation(NavigationData { link: link.to_string() }))
+    }
+    else {
+        Ok(Content::Unknown)
+    }
+}
+
 pub fn get_content(query: &str) -> Result<Vec<Content>, YoutubeError> {
     let body = get_document(query)?;
     let fragment = Html::parse_fragment(&body);
@@ -179,20 +197,12 @@ pub fn get_content(query: &str) -> Result<Vec<Content>, YoutubeError> {
             None => continue,
         };
 
-        let next_content = if link.starts_with("/watch") {
-            get_content_video(element, link)?
-        }
-        else if link.starts_with("/playlist") {
-            get_content_playlist(element, link)?
-        }
-        else if link.starts_with("/channel") {
-            get_content_channel(element, link)?
-        }
-        else if link.starts_with("/") {
-            Content::Navigation(NavigationData { link: link.to_string() })
-        }
-        else {
-            Content::Unknown
+        let next_content = match get_next_content(element, link){
+            Ok(content) => content,
+            Err(err) => {
+                println!("{}", format!("Couldn't get Content for {}: {}", link, err).red());
+                continue
+            }
         };
 
         content.push(next_content);
