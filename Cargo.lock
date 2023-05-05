@@ -1064,6 +1064,7 @@ name = "ytcli"
 version = "0.1.0"
 dependencies = [
  "colored",
+ "rand 0.8.5",
  "scraper",
  "ureq",
 ]

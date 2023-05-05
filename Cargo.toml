@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 colored = "2.0.0"
+rand = "0.8.5"
 scraper = "0.16.0"
 ureq = "2.6.2"

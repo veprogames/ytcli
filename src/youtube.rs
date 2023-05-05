@@ -2,8 +2,33 @@ use std::io;
 use scraper::{Html, Selector, ElementRef};
 use ureq::Response;
 use colored::{Colorize, ColoredString};
+use rand::{seq::SliceRandom};
 
 use crate::format;
+
+/// ## Why Invidious?
+/// * Easier to parse as Invidious is mostly independent of JS and
+/// is less cluttered
+/// * Better Privacy through Invidious
+/// 
+/// Source: https://api.invidious.io/
+const INSTANCES: &[&str] = &[
+    "https://yewtu.be",
+    "https://vid.puffyan.us",
+    "https://inv.riverside.rocks",
+    "https://invidious.kavin.rocks",
+    "https://y.com.sb",
+    "https://invidious.nerdvpn.de",
+    "https://invidious.tiekoetter.com",
+    "https://inv.bp.projectsegfau.lt",
+    "https://yt.artemislena.eu",
+    "https://invidious.flokinet.to",
+];
+
+fn get_random_instance() -> String {
+    let mut rng = rand::thread_rng();
+    INSTANCES.choose(&mut rng).unwrap_or(&"").to_string()
+}
 
 pub enum YoutubeError {
     RequestError(u16),
@@ -96,19 +121,13 @@ impl Content {
     }
 
     pub fn get_url(&self) -> String {
-        format!("{}{}", INSTANCE, self.get_link())
+        format!("{}{}", get_random_instance(), self.get_link())
     }
 }
 
-/// ## Why Invidious?
-/// * Easier to parse as Invidious is mostly independent of JS and
-/// is less cluttered
-/// * Better Privacy through Invidious
-const INSTANCE: &str = "https://yewtu.be";
-
 fn get_response(query: &str) -> Result<Response, ureq::Error> {
     let request = ureq::get(
-        format!("{INSTANCE}{query}").as_str()
+        format!("{}{query}", get_random_instance()).as_str()
     );
     request.call()
 }
