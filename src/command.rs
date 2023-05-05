@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, process::Command};
+use std::{collections::VecDeque, process::{Command, Child}};
 
 use crate::youtube;
 
@@ -93,6 +93,13 @@ impl CommandParser {
         }
     }
 
+    fn handle_child_process(child: &mut Child) -> CommandState{
+        if let Err(_) = child.wait() {
+            return CommandState::Error("mpv wasn't running".to_string());
+        }
+        CommandState::Ok(String::new())
+    }
+
     fn handle_watch(&self, index: &str) -> CommandState{
         let content = match self.get_content_for_index(index) {
             Ok(content) => content,
@@ -106,17 +113,15 @@ impl CommandParser {
             youtube::Content::Unknown => return CommandState::Error("Cannot watch unknown Content".to_string()),
         };
 
-        match Command::new("mpv")
-            .arg(url)
-            .spawn() {
-                Ok(mut child) => {
-                    if let Err(_) = child.wait() {
-                        return CommandState::Error("mpv wasn't running".to_string());
-                    }
-                    CommandState::Ok(String::new())
-                },
-                Err(err) => CommandState::Error(format!("Cannot start mpv. Is it installed? {}", err.to_string())),
-            }
+        if let Ok(mut child) = Command::new("mpv").arg(&url).spawn() {
+            CommandParser::handle_child_process(&mut child)
+        }
+        else if let Ok(mut child) = Command::new("vlc").arg(&url).spawn() {
+            CommandParser::handle_child_process(&mut child)
+        }
+        else {
+            CommandState::Error(format!("Cannot start mpv or vlc. Is one of them installed?"))
+        }
     }
 
     fn handle_download(&self, index: &str) -> CommandState{
