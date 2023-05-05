@@ -12,6 +12,10 @@ pub enum YoutubeError {
     ParseError(String),
 }
 
+pub trait ContentUrl {
+    fn get_url(&self) -> String;
+}
+
 impl std::fmt::Display for YoutubeError{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -30,12 +34,6 @@ pub struct VideoData {
     author: String,
     views: u64,
     length: String,
-}
-
-impl VideoData {
-    pub fn get_url(&self) -> String {
-        format!("{INSTANCE}{}", self.link)
-    }
 }
 
 impl std::fmt::Display for VideoData {
@@ -78,13 +76,28 @@ impl std::fmt::Display for NavigationData {
         write!(f, "{}", self.link)
     }
 }
-
 pub enum Content {
     Video(VideoData),
     Channel(ChannelData),
     Playlist(PlaylistData),
     Navigation(NavigationData),
     Unknown,
+}
+
+impl Content {
+    pub fn get_link(&self) -> String {
+        match self {
+            Content::Video(video) => &video.link,
+            Content::Channel(channel) => &channel.link,
+            Content::Playlist(playlist) => &playlist.link,
+            Content::Navigation(nav) => &nav.link,
+            Content::Unknown => "/"
+        }.to_string()
+    }
+
+    pub fn get_url(&self) -> String {
+        format!("{}{}", INSTANCE, self.get_link())
+    }
 }
 
 /// ## Why Invidious?
@@ -237,14 +250,4 @@ pub fn print_content(videos: &Vec<Content>) -> String {
         result = line + &result;
     }
     result
-}
-
-pub fn get_content_link(content: &Content) -> &str{
-    match content {
-        Content::Video(video) => &video.link,
-        Content::Channel(channel) => &channel.link,
-        Content::Playlist(playlist) => &playlist.link,
-        Content::Navigation(nav) => &nav.link,
-        Content::Unknown => "/"
-    }
 }

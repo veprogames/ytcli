@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, process::Command};
 
-use crate::youtube::{self, get_content_link};
+use crate::youtube;
 
 pub enum CommandState {
     Ok(String),
@@ -72,7 +72,7 @@ impl CommandParser {
                         youtube::Content::Video(..) => Err(
                             CommandState::Error(String::from("Cannot query a video directly. Use w(atch) instead"))
                         ),
-                        _ => Ok(get_content_link(content).to_string())
+                        _ => Ok(content.get_link())
                     },
                     None => Err(CommandState::Error(String::from("Index out of bounds!")))
                 }
@@ -81,22 +81,29 @@ impl CommandParser {
         }
     }
 
-    fn handle_watch(&self, index_as_str: &str) -> CommandState{
-        let index = match index_as_str.parse::<usize>() {
+    fn get_content_for_index(&self, index: &str) -> Result<&youtube::Content, CommandState> {
+        let index = match index.parse::<usize>() {
             Ok(num) => num,
-            Err(err) => return CommandState::Error(format!("Not a Number! ({})", err.to_string()))
+            Err(err) => return Err(CommandState::Error(format!("Not a Number! ({})", err.to_string())))
         };
 
-        let content = match self.current_content.get(index) {
-            Some(content) => content,
-            None => return CommandState::Error("Index out of bounds!".to_string())
+        match self.current_content.get(index) {
+            Some(content) => Ok(content),
+            None => Err(CommandState::Error("Index out of bounds!".to_string()))
+        }
+    }
+
+    fn handle_watch(&self, index: &str) -> CommandState{
+        let content = match self.get_content_for_index(index) {
+            Ok(content) => content,
+            Err(state) => return state,
         };
 
         let url = match content {
-            youtube::Content::Video(video) => video.get_url(),
+            youtube::Content::Video(..) => content.get_url(),
             youtube::Content::Playlist(..) | youtube::Content::Channel(..) => return CommandState::Error("Cannot watch Channel or Playlist directly".to_string()),
             youtube::Content::Navigation(..) => return CommandState::Error("Cannot watch navigational Content".to_string()),
-            youtube::Content::Unknown => return CommandState::Error("Cannot watch unknown Content".to_string())
+            youtube::Content::Unknown => return CommandState::Error("Cannot watch unknown Content".to_string()),
         };
 
         match Command::new("mpv")
@@ -109,6 +116,32 @@ impl CommandParser {
                     CommandState::Ok(String::new())
                 },
                 Err(err) => CommandState::Error(format!("Cannot start mpv. Is it installed? {}", err.to_string())),
+            }
+    }
+
+    fn handle_download(&self, index: &str) -> CommandState{
+        let content = match self.get_content_for_index(index) {
+            Ok(content) => content,
+            Err(state) => return state,
+        };
+
+        let url = match content {
+            youtube::Content::Navigation(..) => return CommandState::Error("Cannot download navigational Content".to_string()),
+            youtube::Content::Unknown => return CommandState::Error("Cannot download unknown Content".to_string()),
+            _ => content.get_url()
+        };
+
+        match Command::new("yt-dlp")
+            .arg(url)
+            .args(["-o", "~/.ytcli/download/%(uploader)s/%(title)s.%(ext)s"])
+            .spawn() {
+                Ok(mut child) => {
+                    if let Err(_) = child.wait() {
+                        return CommandState::Error("yt-dlp wasn't running".to_string());
+                    }
+                    CommandState::Ok(String::new())
+                },
+                Err(err) => CommandState::Error(format!("Cannot start yt-dlp. Is it installed? {}", err.to_string())),
             }
     }
 
@@ -135,9 +168,11 @@ Exit: exit".to_string()
                 };
                 self.handle_query(&url)
             },
-            ("q" | "query", _) => CommandState::Error("Usage: q [term]".to_string()),
+            ("q" | "query", _) => CommandState::Error("Usage: q(uery) [term]".to_string()),
             ("w" | "watch", 1) => self.handle_watch(&params[0]),
-            ("w" | "watch", _) => CommandState::Error("Usage: watch [index]".to_string()),
+            ("w" | "watch", _) => CommandState::Error("Usage: w(atch) [index]".to_string()),
+            ("d" | "download", 1) => self.handle_download(&params[0]),
+            ("d" | "download", _) => CommandState::Error("Usage: d(ownload) [index]".to_string()),
             ("h" | "help", _) => CommandState::Ok(CommandParser::get_help()),
             (unknown_command, _) => CommandState::Error(format!("Unknown Command: {unknown_command}\n{}", CommandParser::get_help())),
         }
