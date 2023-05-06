@@ -152,8 +152,9 @@ impl CommandParser {
 
     fn get_help() -> String {
         "ytcli help:
-Query Videos: q(uery) [term]
-Watch Video: w(atch) [index]
+Query Content: q(uery) [term | index]
+Watch Content: w(atch) [index]
+Download Content: d(ownload) [index]
 Exit: exit".to_string()
     }
     
